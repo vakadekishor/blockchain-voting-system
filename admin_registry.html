@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Voter Registry | VoteLedger</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+    <div class="registry-shell">
+        <header class="registry-header">
+            <div>
+                <p class="eyebrow">Registry</p>
+                <h1>Voter directory</h1>
+            </div>
+            <div class="admin-actions">
+                <button class="outline-button" id="refreshRegistry" type="button">Refresh</button>
+                <a class="button admin-back" href="/admin">Back to admin <strong>↩</strong></a>
+            </div>
+        </header>
+
+        <main class="dashboard-panel registry-panel">
+            <section class="registry-registration">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">Admin-only registration</p><h2>Register a new voter</h2></div>
+                </div>
+                <form id="registryVoterForm" class="admin-form registry-form">
+                    <input name="name" placeholder="Full name" required>
+                    <input name="dob" type="date" required>
+                    <input name="phone_number" type="tel" placeholder="Registered mobile" required>
+                    <input name="email" type="email" placeholder="Gmail (optional)">
+                    <input name="state" placeholder="State" required>
+                    <input name="voter_id" placeholder="Voter ID" required>
+                    <button class="button compact-button" type="submit">Create voter record <strong>+</strong></button>
+                </form>
+                <p id="registryMessage" class="admin-message" role="status"></p>
+            </section>
+            <div class="panel-heading">
+                <div><p class="eyebrow">Registered people</p><h2>All voters</h2></div>
+                <span class="panel-count" id="registryTotal">0 records</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>State</th>
+                            <th>Voter ID / Hash</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registryTable">
+                        <tr><td colspan="7" class="empty-state">Loading registry...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const registryTable = document.getElementById('registryTable');
+        const registryTotal = document.getElementById('registryTotal');
+        const registryMessage = document.getElementById('registryMessage');
+
+        async function loadRegistry() {
+            try {
+                const response = await fetch('/admin/data');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to load registry.');
+
+                const voters = data.voters || [];
+                registryTotal.textContent = `${voters.length} records`;
+
+                registryTable.innerHTML = voters.length ? voters.map((voter) => `
+                    <tr>
+                        <td><strong>${(voter.name || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))}</strong></td>
+                        <td>${(voter.state || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))}</td>
+                        <td><code>${(voter.voter_id || voter.voter_hash || 'Not assigned').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))}</code></td>
+                        <td>${(voter.phone_number || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))}</td>
+                        <td>${(voter.email || 'Not provided').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))}</td>
+                        <td><span class="status-pill ${voter.verified ? 'verified' : 'pending'}">${voter.verified ? 'Verified' : 'Pending'}</span></td>
+                        <td><button class="outline-button danger-button delete-voter-button" data-voter-id="${voter.id}" type="button">Remove</button></td>
+                    </tr>
+                `).join('') : '<tr><td colspan="7" class="empty-state">No voter records found.</td></tr>';
+
+                document.querySelectorAll('.delete-voter-button').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        if (!window.confirm('Delete this voter record? This removes the voter and their vote history.')) return;
+                        const response = await fetch(`/admin/voters/${button.dataset.voterId}`, { method: 'DELETE' });
+                        const result = await response.json();
+                        registryMessage.textContent = result.message || result.error;
+                        registryMessage.className = `admin-message ${response.ok ? 'success' : 'error'}`;
+                        await loadRegistry();
+                    });
+                });
+            } catch (error) {
+                registryTable.innerHTML = `<tr><td colspan="7" class="empty-state">${error.message}</td></tr>`;
+            }
+        }
+
+        document.getElementById('refreshRegistry').addEventListener('click', loadRegistry);
+        document.getElementById('registryVoterForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const response = await fetch('/admin/voters', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries()))
+            });
+            const result = await response.json();
+            registryMessage.textContent = response.ok ? `${result.message} ID: ${result.voter_id}` : (result.error || 'Unable to register voter.');
+            registryMessage.className = `admin-message ${response.ok ? 'success' : 'error'}`;
+            if (response.ok) { event.target.reset(); await loadRegistry(); }
+        });
+        loadRegistry();
+    </script>
+</body>
+</html>

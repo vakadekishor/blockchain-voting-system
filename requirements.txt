@@ -1,0 +1,5 @@
+Flask>=3.0,<4.0
+python-dotenv>=1.0,<2.0
+# Optional production SMS delivery:
+# twilio>=9.0,<10.0
+# Email delivery uses Python's built-in SMTP client; no extra package is required.

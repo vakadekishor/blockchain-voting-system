@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Login | VoteLedger</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+    <div class="login-wrap">
+        <div class="login-box admin-login-box">
+            <div class="brand-header auth-brand">
+                <div class="brand-mark" aria-hidden="true">✓</div>
+                <div>
+                    <p class="eyebrow">Protected area</p>
+                    <h1>Admin access</h1>
+                </div>
+            </div>
+            <form id="adminLoginForm">
+                <div class="form-group">
+                    <label class="color" for="adminUsername">Username</label>
+                    <input id="adminUsername" name="username" type="text" placeholder="admin" required>
+                </div>
+                <div class="form-group">
+                    <label class="color" for="adminPassword">Password</label>
+                    <input id="adminPassword" name="password" type="password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="button">Login to dashboard <strong>→</strong></button>
+                <div id="adminLoginMessage" class="login-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const adminLoginForm = document.getElementById('adminLoginForm');
+        const adminLoginMessage = document.getElementById('adminLoginMessage');
+
+        adminLoginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            adminLoginMessage.textContent = '';
+
+            const payload = {
+                username: document.getElementById('adminUsername').value,
+                password: document.getElementById('adminPassword').value,
+            };
+
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    window.location.href = '/admin';
+                } else {
+                    adminLoginMessage.style.color = 'red';
+                    adminLoginMessage.textContent = result.error || 'Login failed.';
+                }
+            } catch (error) {
+                adminLoginMessage.style.color = 'red';
+                adminLoginMessage.textContent = 'Unable to reach admin server.';
+            }
+        });
+    </script>
+</body>
+</html>

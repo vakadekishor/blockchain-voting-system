@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VoteLedger Console | Secure Elections</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <div class="admin-identity">
+                <span class="brand-mark" aria-hidden="true">◈</span>
+                <div><strong>VoteLedger</strong><small>Secure voting administration</small></div>
+            </div>
+            <nav class="admin-nav" aria-label="Admin navigation">
+                <a class="active" href="/admin?view=overview" target="_blank" rel="noopener noreferrer">Overview</a>
+                <a href="/admin/registry" target="_blank" rel="noopener noreferrer">Voter registry</a>
+                <a href="/admin/elections" target="_blank" rel="noopener noreferrer">Election management</a>
+                <a href="/admin/candidates" target="_blank" rel="noopener noreferrer">Candidate management</a>
+                <a href="/admin?view=activity" target="_blank" rel="noopener noreferrer">Vote activity</a>
+                <a href="/admin?view=blocks" target="_blank" rel="noopener noreferrer">Blockchain</a>
+            </nav>
+            <div class="admin-sidebar-footer">
+                <span class="status-dot"></span>
+                <span><strong>System online</strong><small>Local development mode</small></span>
+                <a class="admin-logout" href="/admin/logout">Logout</a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-topbar">
+                <div class="admin-overview-heading">
+                    <p class="eyebrow">Operations console</p>
+                    <h1>Election overview</h1>
+                    <p class="admin-subtitle">Monitor voter verification, ballots, and ledger health from one place.</p>
+                </div>
+                <div class="admin-actions">
+                    <button class="outline-button" id="refreshButton" type="button">Refresh data</button>
+                    <a class="button admin-back" href="/">Open voter portal <strong>↗</strong></a>
+                </div>
+            </header>
+
+            <section class="admin-section" id="overview">
+                <div class="stat-grid">
+                    <article class="stat-card"><span class="stat-label">Registered voters</span><strong id="voterCount">--</strong><span class="stat-foot">In the voter registry</span></article>
+                    <article class="stat-card"><span class="stat-label">Verified voters</span><strong id="verifiedCount">--</strong><span class="stat-foot">Phone verification complete</span></article>
+                    <article class="stat-card"><span class="stat-label">Votes recorded</span><strong id="voteCount">--</strong><span class="stat-foot">Stored in vote history</span></article>
+                    <article class="stat-card accent-card"><span class="stat-label">Ledger blocks</span><strong id="blockCount">--</strong><span class="stat-foot">Latest chain length</span></article>
+                </div>
+                <div class="chart-grid">
+                    <article class="dashboard-panel chart-panel">
+                        <div class="panel-heading"><div><p class="eyebrow">Distribution</p><h2>Candidate votes</h2></div></div>
+                        <div id="candidateChart" class="chart-bars"></div>
+                    </article>
+                    <article class="dashboard-panel chart-panel">
+                        <div class="panel-heading"><div><p class="eyebrow">Geography</p><h2>Voters by state</h2></div></div>
+                        <div id="stateChart" class="chart-bars"></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="admin-section admin-two-column" id="secure-management">
+                <article class="dashboard-panel">
+                    <div class="panel-heading"><div><p class="eyebrow">Admin-only registration</p><h2>Register a new voter</h2></div></div>
+                    <form id="voterForm" class="admin-form">
+                        <input name="name" placeholder="Full name" required>
+                        <input name="dob" type="date" required>
+                        <input name="phone_number" type="tel" placeholder="Registered mobile" required>
+                        <input name="email" type="email" placeholder="Gmail (optional)">
+                        <input name="state" placeholder="State" required>
+                        <input name="voter_id" placeholder="Voter ID" required>
+                        <button class="button compact-button" type="submit">Create voter record <strong>+</strong></button>
+                    </form>
+                    <p id="voterMessage" class="admin-message" role="status"></p>
+                </article>
+                <article class="dashboard-panel">
+                    <div class="panel-heading"><div><p class="eyebrow">Restricted ledger controls</p><h2>Smart contract and hashes</h2></div></div>
+                    <p class="panel-intro">Only authenticated administrators can inspect transaction hashes, seal blocks, and manage the contract integration.</p>
+                    <div class="status-card">Smart-contract rule: one voter, one vote per election.</div>
+                    <div id="secureTransactions" class="secure-transactions"><p class="empty-state">Loading administrator-only transaction records...</p></div>
+                </article>
+            </section>
+
+            <section class="admin-section" id="elections">
+                <article class="dashboard-panel">
+                    <div class="panel-heading"><div><p class="eyebrow">Election management</p><h2>Create an election</h2></div></div>
+                    <form id="electionForm" class="admin-form">
+                        <input name="name" placeholder="Election name" required>
+                        <input name="description" placeholder="Description">
+                        <div class="form-row"><input name="start_date" type="date" required><input name="end_date" type="date" required></div>
+                        <label><input name="active" type="checkbox"> Active now</label>
+                        <button class="button compact-button" type="submit">Create election <strong>+</strong></button>
+                    </form>
+                    <div class="lifecycle-actions"><button class="outline-button danger-button" id="clearElectionsButton" type="button">Clear all elections</button></div>
+                    <div id="electionLifecycle" class="election-lifecycle"><p class="empty-state">Loading election lifecycle...</p></div>
+                </article>
+            </section>
+
+            <section class="admin-section" id="candidates">
+                <article class="dashboard-panel">
+                    <div class="panel-heading"><div><p class="eyebrow">Candidate management</p><h2>Add a candidate</h2></div></div>
+                    <form id="candidateForm" class="admin-form">
+                        <select name="election_id" id="electionSelect" required><option value="">Choose election</option></select>
+                        <input name="name" placeholder="Candidate name" required>
+                        <input name="party" placeholder="Party or affiliation" required>
+                        <button class="button compact-button" type="submit">Add candidate <strong>+</strong></button>
+                    </form>
+                    <div id="candidateList" class="candidate-list-admin"></div>
+                    <p id="managementMessage" class="admin-message" role="status"></p>
+                </article>
+            </section>
+
+            <section class="admin-section admin-two-column" id="activity">
+                <article class="dashboard-panel">
+                    <div class="panel-heading">
+                        <div><p class="eyebrow">Registry</p><h2>Voter directory</h2></div>
+                        <div class="table-tools">
+                            <input id="voterFilter" type="text" class="table-search" placeholder="Search voters" aria-label="Search voters">
+                            <span class="panel-count" id="directoryCount">0 records</span>
+                        </div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Voter</th><th>Identity</th><th>Phone</th><th>Status</th></tr></thead><tbody id="voterTable"><tr><td colspan="4" class="empty-state">Loading registry...</td></tr></tbody></table></div>
+                </article>
+                <article class="dashboard-panel activity-panel" id="activity-panel">
+                    <div class="panel-heading">
+                        <div><p class="eyebrow">Live feed</p><h2>Vote activity</h2></div>
+                    </div>
+                    <div id="activityList" class="activity-list"><p class="empty-state">Vote details are hidden from the live feed.</p></div>
+                </article>
+            </section>
+
+            <section class="admin-section dashboard-panel" id="blocks">
+                <div class="panel-heading">
+                    <div><p class="eyebrow">Integrity monitor</p><h2>Blockchain ledger</h2></div>
+                    <div class="table-tools">
+                        <input id="blockFilter" type="text" class="table-search" placeholder="Filter blocks" aria-label="Filter blocks">
+                        <button class="button compact-button" id="mineButton" type="button">Mine latest block <strong>+</strong></button>
+                    </div>
+                </div>
+                <div id="chainList" class="chain-list"><p class="empty-state">Loading ledger...</p></div>
+                <div class="export-row">
+                    <a class="button admin-back compact-export" href="/admin/export/csv" target="_blank" rel="noopener noreferrer">Export CSV <strong>↓</strong></a>
+                </div>
+                <p id="adminMessage" class="admin-message" role="status"></p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const pathname = window.location.pathname;
+        const searchView = new URLSearchParams(window.location.search).get('view');
+        const pathView = pathname.endsWith('/elections') ? 'elections' : pathname.endsWith('/candidates') ? 'candidates' : null;
+        const adminView = searchView || pathView || 'overview';
+        const visibleSections = {
+            overview: ['overview'],
+            elections: ['elections'],
+            candidates: ['candidates'],
+            activity: ['activity'],
+            blocks: ['blocks']
+        };
+        document.querySelectorAll('.admin-section').forEach((section) => {
+            section.hidden = !visibleSections[adminView]?.includes(section.id);
+        });
+
+        const overviewHeading = document.querySelector('.admin-overview-heading');
+        const pageTitles = {
+            overview: {title: 'Election overview', subtitle: 'Monitor voter verification, ballots, and ledger health from one place.'},
+            elections: {title: 'Election management', subtitle: 'Create and manage voting events from this dedicated console.'},
+            candidates: {title: 'Candidate management', subtitle: 'Add, edit, and remove candidates for the active election.'},
+            activity: {title: 'Vote activity', subtitle: 'Review voter participation without exposing sensitive details.'},
+            blocks: {title: 'Blockchain ledger', subtitle: 'Inspect sealed blocks and chain integrity.'}
+        };
+        const selectedTitle = pageTitles[adminView] || pageTitles.overview;
+        overviewHeading.hidden = false;
+        overviewHeading.querySelector('h1').textContent = selectedTitle.title;
+        overviewHeading.querySelector('.admin-subtitle').textContent = selectedTitle.subtitle;
+        document.querySelectorAll('.admin-nav a').forEach((link) => link.classList.toggle('active', link.href.includes(`view=${adminView}`)));
+
+        const voterCount = document.getElementById('voterCount');
+        const verifiedCount = document.getElementById('verifiedCount');
+        const voteCount = document.getElementById('voteCount');
+        const blockCount = document.getElementById('blockCount');
+        const voterTable = document.getElementById('voterTable');
+        const directoryCount = document.getElementById('directoryCount');
+        const activityList = document.getElementById('activityList');
+        const chainList = document.getElementById('chainList');
+        const adminMessage = document.getElementById('adminMessage');
+        const candidateChart = document.getElementById('candidateChart');
+        const stateChart = document.getElementById('stateChart');
+        const voterFilter = document.getElementById('voterFilter');
+        const voteFilter = document.getElementById('voteFilter');
+        const blockFilter = document.getElementById('blockFilter');
+        const voterMessage = document.getElementById('voterMessage');
+        const secureTransactions = document.getElementById('secureTransactions');
+        const electionLifecycle = document.getElementById('electionLifecycle');
+        const clearElectionsButton = document.getElementById('clearElectionsButton');
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+
+        function renderBarChart(container, items) {
+            if (!items || !items.length) {
+                container.innerHTML = '<p class="empty-state">No data.</p>';
+                return;
+            }
+            const maxItem = Math.max(...items.map((item) => Number(item.value) || 0), 1);
+            container.innerHTML = items.map((item) => `
+                <div class="bar-row">
+                    <span>${escapeHtml(item.label)}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width: ${(Number(item.value) / maxItem) * 100}%"></div></div>
+                    <strong>${Number(item.value) || 0}</strong>
+                </div>
+            `).join('');
+        }
+
+        async function loadDashboard() {
+            adminMessage.textContent = '';
+            try {
+                const response = await fetch('/admin/data');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to load dashboard data.');
+
+                voterCount.textContent = data.stats.voters;
+                verifiedCount.textContent = data.stats.verified;
+                voteCount.textContent = data.stats.votes;
+                blockCount.textContent = data.stats.blocks;
+                directoryCount.textContent = `${data.voters.length} records`;
+                renderBarChart(candidateChart, data.charts?.candidate_breakdown || []);
+                renderBarChart(stateChart, data.charts?.state_breakdown || []);
+
+                const voterSearch = (voterFilter?.value || '').toLowerCase();
+                const filteredVoters = (data.voters || []).filter((voter) => {
+                    const haystack = `${voter.name || ''} ${voter.state || ''} ${voter.phone_number || ''} ${voter.voter_id || voter.voter_hash || ''}`.toLowerCase();
+                    return haystack.includes(voterSearch);
+                });
+
+                directoryCount.textContent = `${filteredVoters.length} records`;
+                voterTable.innerHTML = filteredVoters.length ? filteredVoters.map((voter) => `
+                    <tr>
+                        <td><strong>${escapeHtml(voter.name)}</strong><small>${escapeHtml(voter.state)}</small></td>
+                        <td><code>${escapeHtml(voter.voter_id || voter.voter_hash || 'Not assigned')}</code></td>
+                        <td>${escapeHtml(voter.phone_number)}</td>
+                        <td><span class="status-pill ${voter.verified ? 'verified' : 'pending'}">${voter.verified ? 'Verified' : 'Pending'}</span></td>
+                        <td><button class="outline-button danger-button delete-voter-button" data-voter-id="${voter.id}" type="button">Remove</button></td>
+                    </tr>
+                `).join('') : '<tr><td colspan="5" class="empty-state">No matching voters found.</td></tr>';
+
+                document.querySelectorAll('.delete-voter-button').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        if (!window.confirm('Delete this voter record? This removes the voter and their vote history.')) return;
+                        const response = await fetch(`/admin/voters/${button.dataset.voterId}`, { method: 'DELETE' });
+                        const result = await response.json();
+                        adminMessage.textContent = result.message || result.error;
+                        await loadDashboard();
+                    });
+                });
+
+                const filteredVotes = data.votes || [];
+                activityList.innerHTML = '<p class="empty-state">Vote details are hidden from the live feed.</p>';
+
+                secureTransactions.innerHTML = filteredVotes.length ? filteredVotes.slice(0, 8).map((vote) => `
+                    <div class="secure-transaction"><strong>Block ${escapeHtml(vote.block_index)}</strong><code>${escapeHtml(vote.transaction_hash)}</code></div>
+                `).join('') : '<p class="empty-state">No transaction records yet.</p>';
+
+                electionLifecycle.innerHTML = data.elections?.length ? data.elections.map((election) => `
+                    <div class="election-lifecycle-row"><div><strong>${escapeHtml(election.name)}</strong><small>${escapeHtml(election.start_date)} to ${escapeHtml(election.end_date)} · ${election.active ? 'Active' : 'Closed'}</small></div><button class="outline-button election-status-button" data-election-id="${election.id}" data-active="${election.active ? 'false' : 'true'}">${election.active ? 'Complete election' : 'Activate election'}</button></div>
+                `).join('') : '<p class="empty-state">No elections created yet.</p>';
+                document.querySelectorAll('.election-status-button').forEach((button) => button.addEventListener('click', async () => {
+                    button.disabled = true;
+                    const response = await fetch(`/admin/elections/${button.dataset.electionId}/status`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({active: button.dataset.active === 'true'}) });
+                    const result = await response.json();
+                    document.getElementById('managementMessage').textContent = result.message || result.error;
+                    await loadDashboard();
+                }));
+
+                const blockSearch = (blockFilter?.value || '').toLowerCase();
+                const filteredBlocks = (data.chain || []).filter((block) => {
+                    const haystack = `${block.index || ''} ${block.previous_hash || ''} ${block.votes?.map((vote) => vote.candidate).join(' ') || ''}`.toLowerCase();
+                    return haystack.includes(blockSearch);
+                });
+
+                chainList.innerHTML = filteredBlocks.length ? filteredBlocks.slice().reverse().map((block) => `
+                    <div class="chain-item"><div class="block-number">#${escapeHtml(block.index)}</div><div class="chain-details"><strong>Ledger block sealed</strong><small>${escapeHtml(block.timestamp)} · Nonce ${escapeHtml(block.nonce)}</small></div><code>${escapeHtml(block.previous_hash)}</code></div>
+                `).join('') : '<p class="empty-state">No matching blocks found.</p>';
+
+                const candidateList = document.getElementById('candidateList');
+                candidateList.innerHTML = (data.candidates || []).length ? data.candidates.map((candidate) => `
+                    <div class="candidate-edit-row">
+                        <div>
+                            <strong>${escapeHtml(candidate.name)}</strong>
+                            <small>${escapeHtml(candidate.party)}</small>
+                        </div>
+                        <div class="inline-edit-controls">
+                            <input type="text" value="${escapeHtml(candidate.name)}" data-edit-name="${candidate.id}" aria-label="Edit candidate name">
+                            <input type="text" value="${escapeHtml(candidate.party)}" data-edit-party="${candidate.id}" aria-label="Edit party name">
+                            <button class="outline-button" data-save-candidate="${candidate.id}" type="button">Save</button>
+                            <button class="outline-button danger-button" data-delete-candidate="${candidate.id}" type="button">Remove</button>
+                        </div>
+                    </div>
+                `).join('') : '<p class="empty-state">No candidates yet.</p>';
+
+                document.querySelectorAll('[data-save-candidate]').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const candidateId = button.dataset.saveCandidate;
+                        const updatedName = document.querySelector(`[data-edit-name="${candidateId}"]`).value.trim();
+                        const updatedParty = document.querySelector(`[data-edit-party="${candidateId}"]`).value.trim();
+                        const response = await fetch(`/admin/candidates/${candidateId}`, {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ name: updatedName, party: updatedParty })
+                        });
+                        const result = await response.json();
+                        document.getElementById('managementMessage').textContent = result.message || result.error;
+                        await loadDashboard();
+                    });
+                });
+
+                document.querySelectorAll('[data-delete-candidate]').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        if (!window.confirm('Remove this candidate and party from the election?')) return;
+                        const response = await fetch(`/admin/candidates/${button.dataset.deleteCandidate}`, { method: 'DELETE' });
+                        const result = await response.json();
+                        document.getElementById('managementMessage').textContent = result.message || result.error;
+                        await loadDashboard();
+                    });
+                });
+            } catch (error) {
+                adminMessage.textContent = error.message;
+            }
+        }
+
+        voterFilter?.addEventListener('input', loadDashboard);
+        voteFilter?.addEventListener('input', loadDashboard);
+        blockFilter?.addEventListener('input', loadDashboard);
+        document.getElementById('refreshButton').addEventListener('click', loadDashboard);
+        document.getElementById('mineButton').addEventListener('click', async () => {
+            const button = document.getElementById('mineButton');
+            button.disabled = true;
+            button.textContent = 'Mining...';
+            try {
+                const response = await fetch('/mine');
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Mining failed.');
+                adminMessage.textContent = `Block #${result.index} mined successfully.`;
+                await loadDashboard();
+            } catch (error) {
+                adminMessage.textContent = error.message;
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Mine latest block <strong>+</strong>';
+            }
+        });
+
+        async function submitManagementForm(form, endpoint) {
+            const payload = Object.fromEntries(new FormData(form).entries());
+            payload.active = form.elements.active ? form.elements.active.checked : undefined;
+            const response = await fetch(endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Unable to save record.');
+            document.getElementById('managementMessage').textContent = result.message;
+            form.reset();
+            await loadDashboard();
+        }
+
+        document.getElementById('electionForm').addEventListener('submit', async (event) => { event.preventDefault(); try { await submitManagementForm(event.target, '/admin/elections'); } catch (error) { document.getElementById('managementMessage').textContent = error.message; } });
+        document.getElementById('candidateForm').addEventListener('submit', async (event) => { event.preventDefault(); try { await submitManagementForm(event.target, '/admin/candidates'); } catch (error) { document.getElementById('managementMessage').textContent = error.message; } });
+        document.getElementById('voterForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const response = await fetch('/admin/voters', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())) });
+            const result = await response.json();
+            voterMessage.textContent = response.ok ? `${result.message} ID: ${result.voter_id}` : (result.error || 'Unable to register voter.');
+            voterMessage.className = `admin-message ${response.ok ? 'success' : 'error'}`;
+            if (response.ok) { event.target.reset(); await loadDashboard(); }
+        });
+        clearElectionsButton.addEventListener('click', async () => {
+            if (!window.confirm('Clear all elections, candidates, and vote records? Voter registrations will remain.')) return;
+            clearElectionsButton.disabled = true;
+            const response = await fetch('/admin/elections/clear', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirm: true}) });
+            const result = await response.json();
+            document.getElementById('managementMessage').textContent = result.message || result.error;
+            clearElectionsButton.disabled = false;
+            await loadDashboard();
+        });
+
+        const originalLoadDashboard = loadDashboard;
+        loadDashboard = async function() {
+            await originalLoadDashboard();
+            const response = await fetch('/admin/data');
+            const data = await response.json();
+            document.getElementById('electionSelect').innerHTML = '<option value="">Choose election</option>' + (data.elections || []).map((election) => `<option value="${escapeHtml(election.id)}">${escapeHtml(election.name)}</option>`).join('');
+        };
+
+        loadDashboard();
+    </script>
+</body>
+</html>

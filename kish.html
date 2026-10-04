@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blockchain Voting System | VoteLedger</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="bg-Container"><main class="app-shell">
+        <header class="brand-header"><div class="brand-mark" aria-label="Secure voting portal">✓</div></header>
+        <nav class="flow-steps" aria-label="Voting stages">
+            <button class="flow-step active" data-tab="otp" type="button">1. OTP Login</button><button class="flow-step" data-tab="verify" type="button">2. Verify OTP</button><button class="flow-step" data-tab="selection" type="button">3. Election / Candidate</button><button class="flow-step" data-tab="vote" type="button">4. One-Time Vote</button><button class="flow-step" data-tab="results" type="button">5. Results Dashboard</button>
+        </nav>
+        <section class="login-box tab-panel" id="otpPanel" data-panel="otp"><div id="loginPanel"><div class="head">Voter login</div><p class="panel-intro">Use your admin-issued voter ID and registered details. A six-digit OTP will be sent to your mobile.</p><form id="loginForm"><div class="form-group"><label class="color">Voter ID<input name="voter_id" required autocomplete="username"></label></div><div class="form-group"><label class="color">Full name<input name="name" required></label></div><div class="form-group"><label class="color">Date of birth<input name="dob" type="date" required></label></div><div class="form-group"><label class="color">Registered mobile<input name="phone_number" type="tel" required></label></div><div class="form-group"><label class="color">State<input name="state" required></label></div><button class="button" type="submit">Send secure OTP <strong>→</strong></button></form><p id="loginMessage" class="form-message" role="status"></p></div></section>
+        <section class="login-box tab-panel" id="verificationPanel" data-panel="verify" hidden><div class="head">Verify your OTP</div><p id="otpDelivery" class="panel-intro"></p><form id="otpForm"><div class="form-group"><label class="color">Six-digit OTP<input id="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label></div><button class="button" type="submit">Verify identity <strong>→</strong></button></form><p id="otpMessage" class="form-message" role="status"></p></section>
+        <section class="login-box tab-panel" id="selectionPanel" data-panel="selection" hidden><div class="head">Election and candidate selection</div><p class="panel-intro">Select one candidate. Your choice is submitted once and cannot be changed.</p><div id="electionsList"></div><p id="voteMessage" class="form-message" role="status"></p></section>
+        <section class="login-box tab-panel" id="votePanel" data-panel="vote" hidden><div class="head">One-time vote</div><p class="panel-intro">Review your selected ballot and submit it once to the voting system.</p><div id="voteReview" class="review-box">Select an election and candidate first.</div><button id="confirmVoteButton" class="button" type="button" disabled>Confirm and cast vote <strong>→</strong></button></section>
+        <section class="login-box tab-panel" id="resultsPanel" data-panel="results" hidden><div class="head">Results dashboard</div><p class="panel-intro">Live totals are shown by candidate. Your public history contains only a protected transaction reference.</p><div id="resultsList"></div></section>
+    </main></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const formPayload = (form) => Object.fromEntries(new FormData(form).entries());
+const showMessage = (element, text, error = false) => { element.textContent = text; element.className = `form-message ${error ? 'error' : 'success'}`; };
+let currentPhone = '';
+let selectedBallot = null;
+let hasVoted = false;
+const setStep = (step) => {
+    document.querySelectorAll('.flow-step').forEach((item) => item.classList.toggle('active', item.dataset.tab === step));
+    document.querySelectorAll('.tab-panel').forEach((panel) => panel.hidden = panel.dataset.panel !== step);
+};
+document.querySelectorAll('.flow-step').forEach((tab) => tab.addEventListener('click', () => {
+    if (hasVoted && ['selection', 'vote'].includes(tab.dataset.tab)) return;
+    setStep(tab.dataset.tab);
+}));
+
+$('loginForm').addEventListener('submit', async (event) => {
+    event.preventDefault(); showMessage($('loginMessage'), '');
+    const data = formPayload(event.target); currentPhone = data.phone_number;
+    const response = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await response.json();
+    if (!response.ok) return showMessage($('loginMessage'), result.error, true);
+    showMessage($('loginMessage'), `A secure verification code was sent. It expires in ${Math.round(result.expires_in / 60)} minutes.`);
+    $('otpDelivery').textContent = 'A secure verification code has been sent to your registered contact.';
+    $('otp').value = '';
+    $('otpMessage').textContent = '';
+    $('otpMessage').className = 'form-message';
+    setStep('verify');
+});
+
+$('otpForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/verify_otp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ phone_number: currentPhone, otp: $('otp').value }) });
+    const result = await response.json();
+    if (!response.ok) return showMessage($('otpMessage'), result.error, true);
+    showMessage($('otpMessage'), result.message);
+    setStep('selection');
+    loadElections();
+});
+
+async function loadElections() {
+    const response = await fetch('/api/elections'); const elections = await response.json();
+    const open = elections.filter((e) => e.active);
+    $('electionsList').innerHTML = open.length ? open.map((e) => `<article class="election-card"><p class="eyebrow">${e.start_date} to ${e.end_date}</p><h2>${escapeHtml(e.name)}</h2><p>${escapeHtml(e.description || '')}</p><div class="candidate-list">${e.candidates.map((candidate) => `<button class="button candidate-button" data-election="${e.id}" data-candidate="${candidate.id}"><span>${escapeHtml(candidate.name)} · ${escapeHtml(candidate.party)}</span><strong>→</strong></button>`).join('')}</div></article>`).join('') : '<p class="empty-state">No active elections are available.</p>';
+    document.querySelectorAll('.candidate-button').forEach((button) => button.addEventListener('click', () => selectCandidate(button)));
+}
+function selectCandidate(button) {
+    selectedBallot = {election_id: button.dataset.election, candidate_id: button.dataset.candidate, label: button.querySelector('span').textContent};
+    $('voteReview').textContent = selectedBallot.label;
+    $('confirmVoteButton').disabled = false;
+    setStep('vote');
+}
+async function castVote() {
+    if (!selectedBallot) return;
+    $('confirmVoteButton').disabled = true;
+    const response = await fetch('/vote', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(selectedBallot)});
+    const result = await response.json();
+    if (!response.ok) { showMessage($('voteMessage'), result.error, true); $('confirmVoteButton').disabled = false; return; }
+    hasVoted = true;
+    selectedBallot = null;
+    document.querySelectorAll('.candidate-button').forEach((item) => item.disabled = true);
+    showMessage($('voteMessage'), 'Vote accepted and recorded. Blockchain verification details are restricted to administrators.');
+    setStep('results'); await loadResults();
+}
+$('confirmVoteButton').addEventListener('click', castVote);
+async function loadResults() {
+    const response = await fetch('/api/results'); const elections = await response.json();
+    $('resultsList').innerHTML = elections.map((election) => `<article class="result-card"><div class="result-heading"><h2>${escapeHtml(election.election)}</h2><strong>${election.total_votes} vote${election.total_votes === 1 ? '' : 's'}</strong></div>${election.candidates.map((candidate) => `<div class="result-row"><span>${escapeHtml(candidate.candidate)} <small>${escapeHtml(candidate.party)}</small></span><div class="result-track"><i style="width:${candidate.percentage}%"></i></div><strong>${candidate.votes} · ${candidate.percentage}%</strong></div>`).join('')}</article>`).join('');
+}
+function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character])); }
+</script>
+</body>
+</html>
